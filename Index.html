@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f5d3a">
+<title>Registro de visitas</title>
+<style>
+  :root {
+    --bg: #f4efe6;
+    --card: #fffdf8;
+    --ink: #1f1a14;
+    --muted: #6b6155;
+    --line: #e2d9ca;
+    --accent: #2f5d3a;
+    --accent-ink: #ffffff;
+    --rec: #c8372d;
+    --warn-bg: #fff2a8;
+    --warn-ink: #5a4a00;
+    --ok: #2f7a45;
+    --shadow: 0 10px 30px rgba(47, 93, 58, .25);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15120e;
+      --card: #221d17;
+      --ink: #f1ebe1;
+      --muted: #a89c8c;
+      --line: #3a3229;
+      --accent: #5fa872;
+      --accent-ink: #0d1a10;
+      --rec: #ff5a4e;
+      --warn-bg: #4a3f0a;
+      --warn-ink: #ffe98a;
+      --ok: #6fcf8a;
+      --shadow: 0 10px 30px rgba(0, 0, 0, .5);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    max-width: 520px; margin: 0 auto;
+  }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+  .chip {
+    font-size: 13px; padding: 5px 10px; border-radius: 999px; background: var(--card);
+    border: 1px solid var(--line); color: var(--muted); white-space: nowrap;
+  }
+  .chip b { color: var(--ink); }
+  .chip .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 6px; vertical-align: 1px; }
+  .chip.off .dot { background: var(--rec); }
+
+  /* Botón principal */
+  .stage { display: flex; flex-direction: column; align-items: center; padding: 28px 0 12px; }
+  #btn {
+    width: min(64vw, 240px); height: min(64vw, 240px); border-radius: 50%; border: 0;
+    background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: transform .12s ease, background .2s ease;
+    touch-action: manipulation;
+  }
+  #btn:active { transform: scale(.96); }
+  #btn svg { width: 38%; height: 38%; }
+  #btn.grabando { background: var(--rec); animation: pulso 1.4s ease-in-out infinite; }
+  #btn:disabled { opacity: .55; }
+  @keyframes pulso {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(200, 55, 45, .45); }
+    50% { box-shadow: 0 0 0 22px rgba(200, 55, 45, 0); }
+  }
+  #etiqueta { margin-top: 18px; font-size: 20px; font-weight: 600; text-align: center; min-height: 1.5em; }
+  #reloj { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 15px; min-height: 1.3em; }
+  #cancelar { margin-top: 6px; background: none; border: 0; color: var(--muted); font-size: 15px; text-decoration: underline; padding: 8px; display: none; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-top: 14px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+  #respuesta { font-size: 18px; }
+  #respuesta.error { color: var(--rec); }
+  #transcripcion { color: var(--muted); font-size: 14px; margin-top: 8px; font-style: italic; display: none; }
+  .caballo { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+  .caballo:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+  .caballo h3 { margin: 0 0 6px; font-size: 19px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .caballo h3 small { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .etiq { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--line); color: var(--ink); }
+  .etiq.ok { background: var(--ok); color: var(--card); }
+  .etiq.pend { background: var(--warn-bg); color: var(--warn-ink); }
+  .campos { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 16px; margin: 0; }
+  .campos dt { color: var(--muted); }
+  .campos dd { margin: 0; overflow-wrap: anywhere; }
+  .campos .falta { background: var(--warn-bg); color: var(--warn-ink); border-radius: 6px; padding: 0 6px; font-weight: 600; }
+  .fila-botones { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .btn2 {
+    border: 1px solid var(--line); background: transparent; color: var(--ink);
+    border-radius: 10px; padding: 9px 12px; font: inherit; font-size: 15px; cursor: pointer;
+  }
+  .btn2.primario { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+  #pendientes ul { margin: 0; padding: 0; list-style: none; }
+  #pendientes li { background: var(--warn-bg); color: var(--warn-ink); border-radius: 10px; padding: 8px 10px; margin-top: 6px; font-size: 15px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 15px; padding: 4px 0; }
+  textarea, input[type=password], input[type=text] {
+    width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+  }
+  textarea { min-height: 90px; resize: vertical; }
+  #respaldo { display: none; }
+  #respaldo label { display: block; text-align: center; }
+  #respaldo input { display: none; }
+  footer { margin-top: 22px; display: flex; justify-content: space-between; color: var(--muted); font-size: 14px; }
+  footer button { background: none; border: 0; color: var(--muted); font: inherit; text-decoration: underline; padding: 6px 0; }
+
+  /* Pantalla de clave */
+  #pantallaClave {
+    position: fixed; inset: 0; background: var(--bg); display: none;
+    align-items: center; justify-content: center; padding: 24px; z-index: 10;
+  }
+  #pantallaClave .card { width: 100%; max-width: 420px; }
+  #errClave { color: var(--rec); font-size: 15px; min-height: 1.3em; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Visitas 🐴</h1>
+  <span id="chip" class="chip"><span class="dot"></span><span id="chipTxt">En línea</span></span>
+</header>
+
+<div class="stage">
+  <button id="btn" aria-label="Grabar audio">
+    <svg id="icoMic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="9" y="2" width="6" height="12" rx="3"></rect>
+      <path d="M5 11a7 7 0 0 0 14 0"></path>
+      <line x1="12" y1="18" x2="12" y2="22"></line>
+    </svg>
+    <svg id="icoStop" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none">
+      <path d="M3 11.5 20 3l-5.5 17-3-7.5z"></path>
+    </svg>
+  </button>
+  <div id="etiqueta">Tocá para grabar</div>
+  <div id="reloj"></div>
+  <button id="cancelar">Cancelar</button>
+</div>
+
+<div id="respaldo" class="card">
+  <h2>Grabar con el teléfono</h2>
+  <p style="margin:0 0 10px;font-size:15px">Este navegador no deja usar el micrófono desde la página. Usá la grabadora del teléfono:</p>
+  <label class="btn2 primario">🎙️ Grabar audio
+    <input id="archivo" type="file" accept="audio/*" capture>
+  </label>
+</div>
+
+<div class="card" id="cardRespuesta" style="display:none">
+  <h2>Respuesta</h2>
+  <div id="respuesta"></div>
+  <div id="detalle"></div>
+  <div id="transcripcion"></div>
+  <div class="fila-botones">
+    <button class="btn2" id="repetir">🔊 Repetir</button>
+    <button class="btn2" id="verTexto">Ver lo que entendió</button>
+  </div>
+</div>
+
+<div class="card" id="pendientes" style="display:none">
+  <h2>Datos que faltan</h2>
+  <ul id="listaPend"></ul>
+</div>
+
+<div class="card">
+  <details id="detEscribir">
+    <summary>Escribir en vez de hablar</summary>
+    <textarea id="texto" placeholder="Ej.: Lo de Tormenta es de Juan Pérez, lo derivó Gómez."></textarea>
+    <div class="fila-botones"><button class="btn2 primario" id="enviarTexto">Enviar</button></div>
+  </details>
+</div>
+
+<footer>
+  <button id="toggleVoz">🔊 Voz: sí</button>
+  <button id="cambiarClave">Cambiar clave</button>
+</footer>
+
+<div id="pantallaClave">
+  <div class="card">
+    <h2>Primera vez</h2>
+    <p style="margin:0">Escribí la clave de acceso. Se guarda en este teléfono y no te la vuelve a pedir.</p>
+    <input id="inClave" type="password" autocomplete="current-password" placeholder="Clave">
+    <div id="errClave"></div>
+    <div class="fila-botones"><button class="btn2 primario" id="guardarClave">Entrar</button></div>
+  </div>
+</div>
+
+<script>
+/* ===================================================================
+   CONFIGURACIÓN
+   Solo si esta página se aloja FUERA de Apps Script (ej. GitHub Pages):
+   pegá acá la URL de la implementación (termina en /exec).
+   =================================================================== */
+const URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbyzphRti5D6s5FfWWaWSZBwNL1OgV1qMr8bocaCcAuLzuSGxeR7pHPbHgw7q1IK_18BAQ/exec';
+
+const EN_APPS_SCRIPT = typeof google !== 'undefined' && google.script && google.script.run;
+const MAX_SEG = 300;                 // corta solo a los 5 minutos
+const FORMATOS_OK = ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac', 'audio/flac'];
+
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+
+let clave = store.get('clave', '');
+let vozActiva = store.get('voz', '1') === '1';
+let ultimoMensaje = '';
+
+/* ---------------- Comunicación con el servidor ---------------- */
+
+function llamar(accion, datos) {
+  if (EN_APPS_SCRIPT) {
+    const fn = { procesar: 'apiProcesar', estado: 'apiEstado', verificar: 'apiVerificarClave' }[accion];
+    const arg = accion === 'procesar' ? datos : datos.clave;
+    return new Promise((ok, mal) => google.script.run.withSuccessHandler(ok).withFailureHandler(mal)[fn](arg));
+  }
+  if (!URL_SCRIPT) return Promise.reject(new Error('Falta URL_SCRIPT'));
+  return fetch(URL_SCRIPT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita el "preflight" CORS
+    body: JSON.stringify(Object.assign({ accion }, datos)),
+  }).then((r) => r.json());
+}
+
+/* ---------------- Cola local (por si no hay señal en el campo) ---------------- */
+
+const DB = {
+  db: null,
+  abrir() {
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise((ok, mal) => {
+      const req = indexedDB.open('cola-visitas', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('cola', { keyPath: 'id' });
+      req.onsuccess = () => { this.db = req.result; ok(this.db); };
+      req.onerror = () => mal(req.error);
+    });
+  },
+  async tx(modo, fn) {
+    const db = await this.abrir();
+    return new Promise((ok, mal) => {
+      const t = db.transaction('cola', modo);
+      const r = fn(t.objectStore('cola'));
+      t.oncomplete = () => ok(r && r.result);
+      t.onerror = () => mal(t.error);
+    });
+  },
+  poner(item) { return this.tx('readwrite', (s) => s.put(item)); },
+  borrar(id) { return this.tx('readwrite', (s) => s.delete(id)); },
+  todos() { return this.tx('readonly', (s) => s.getAll()); },
+};
+// Respaldo en memoria si IndexedDB no está disponible (algunos modos privados).
+const colaMemoria = [];
+async function colaPoner(it) { try { await DB.poner(it); } catch (e) { const i = colaMemoria.findIndex((x) => x.id === it.id); if (i >= 0) colaMemoria[i] = it; else colaMemoria.push(it); } }
+async function colaBorrar(id) { try { await DB.borrar(id); } catch (e) {} const i = colaMemoria.findIndex((x) => x.id === id); if (i >= 0) colaMemoria.splice(i, 1); }
+async function colaTodos() { let a = []; try { a = await DB.todos() || []; } catch (e) {} return a.concat(colaMemoria).sort((x, y) => x.ts - y.ts); }
+
+function nuevoId() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10); }
+
+let enviando = false;
+async function procesarCola() {
+  if (enviando) return;
+  enviando = true;
+  let huboAlgo = false;
+  const vistos = {};
+  let cortar = false;
+  try {
+   while (!cortar) {
+    // Se vuelve a leer la cola: lo que se grabó mientras se enviaba otro audio también sale.
+    const items = (await colaTodos()).filter((x) => !vistos[x.id]);
+    if (!items.length) break;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      vistos[it.id] = true;
+      huboAlgo = true;
+      if (!grabando) ponerEtiqueta(it.texto ? 'Procesando el texto…' : 'Procesando el audio…');
+      let res;
+      try {
+        res = await llamar('procesar', {
+          clave, audioBase64: it.b64 || null, mimeType: it.mime || null, texto: it.texto || null, idCliente: it.id,
+        });
+      } catch (e) {
+        it.intentos = (it.intentos || 0) + 1;
+        await colaPoner(it);
+        mostrarRespuesta(navigator.onLine
+          ? 'No pude conectar con el servidor. El ' + (it.texto ? 'texto' : 'audio') + ' quedó guardado y lo reintento solo.'
+          : 'Sin señal: el ' + (it.texto ? 'texto' : 'audio') + ' quedó guardado en el teléfono y se manda solo cuando vuelva la conexión.', false, true);
+        cortar = true;
+        break;
+      }
+      if (res && res.ok) {
+        await colaBorrar(it.id);
+        mostrarRespuesta(res.mensaje, false, false, res.transcripcion, res.detalle);
+      } else if (res && res.error === 'formato' && it.b64 && !it.wav) {
+        // Gemini no aceptó el formato del teléfono: se convierte a WAV y se reintenta.
+        store.set('forzarWav', '1');
+        try {
+          it.b64 = await base64AWav(it.b64);
+          it.mime = 'audio/wav'; it.wav = true;
+          await colaPoner(it);
+          i--; continue;
+        } catch (e) {
+          await colaBorrar(it.id);
+          mostrarRespuesta('No pude convertir el audio. Probá grabarlo de nuevo o escribilo.', true);
+        }
+      } else if (res && (res.error === 'clave' || res.error === 'sin_clave')) {
+        pedirClave(res.mensaje);
+        cortar = true;
+        break;
+      } else if (res && (res.error === 'grande' || res.error === 'vacio')) {
+        await colaBorrar(it.id); // reenviarlo no lo arregla
+        mostrarRespuesta(res.mensaje, true);
+      } else {
+        // Problema del lado del servidor (configuración, IA): se conserva y se reintenta.
+        it.intentos = (it.intentos || 0) + 1;
+        if (it.texto && it.intentos > 20) {
+          await colaBorrar(it.id);
+        } else {
+          await colaPoner(it);
+        }
+        mostrarRespuesta((res && res.mensaje) || 'Error desconocido.', true);
+        cortar = true;
+        break;
+      }
+    }
+   }
+  } finally {
+    enviando = false;
+    if (!grabando && huboAlgo) ponerEtiqueta('Tocá para grabar');
+    actualizarChip();
+    if (huboAlgo) refrescarEstado();
+  }
+}
+
+async function actualizarChip() {
+  const n = (await colaTodos()).length;
+  const online = navigator.onLine;
+  $('chip').classList.toggle('off', !online);
+  $('chipTxt').innerHTML = (online ? 'En línea' : 'Sin señal') + (n ? ' · <b>' + n + '</b> en espera' : '');
+}
+
+/* ---------------- Grabación ---------------- */
+
+let rec = null, stream = null, trozos = [], grabando = false, cancelado = false, t0 = 0, timer = null, wakeLock = null;
+
+function elegirMime() {
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+  const op = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/aac'];
+  for (const m of op) if (MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+}
+
+async function iniciarGrabacion() {
+  desbloquearVoz();
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+  } catch (e) {
+    mostrarRespuesta('No pude usar el micrófono (' + (e.name || e.message) + '). Usá el botón "Grabar audio" de abajo.', true);
+    $('respaldo').style.display = 'block';
+    return;
+  }
+  const mime = elegirMime();
+  try {
+    rec = mime ? new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 32000 }) : new MediaRecorder(stream);
+  } catch (e) {
+    rec = new MediaRecorder(stream);
+  }
+  trozos = []; cancelado = false;
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) trozos.push(e.data); };
+  rec.onstop = alTerminar;
+  rec.start(1000);
+  grabando = true; t0 = Date.now();
+  $('btn').classList.add('grabando');
+  $('icoMic').style.display = 'none'; $('icoStop').style.display = '';
+  $('btn').setAttribute('aria-label', 'Enviar audio');
+  $('cancelar').style.display = 'inline-block';
+  ponerEtiqueta('Grabando… tocá para enviar');
+  timer = setInterval(tic, 250); tic();
+  try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+
+function tic() {
+  const s = Math.floor((Date.now() - t0) / 1000);
+  $('reloj').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  if (s >= MAX_SEG) detenerGrabacion(false);
+}
+
+function detenerGrabacion(cancelar) {
+  if (!rec || !grabando) return;
+  cancelado = !!cancelar;
+  grabando = false;
+  clearInterval(timer);
+  try { rec.stop(); } catch (e) {}
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  $('btn').classList.remove('grabando');
+  $('icoMic').style.display = ''; $('icoStop').style.display = 'none';
+  $('btn').setAttribute('aria-label', 'Grabar audio');
+  $('cancelar').style.display = 'none';
+  $('reloj').textContent = '';
+  try { if (wakeLock) wakeLock.release(); } catch (e) {}
+  wakeLock = null;
+  ponerEtiqueta(cancelado ? 'Cancelado' : 'Enviando…');
+}
+
+async function alTerminar() {
+  if (cancelado || !trozos.length) { ponerEtiqueta('Tocá para grabar'); return; }
+  const tipo = (rec && rec.mimeType) || trozos[0].type || 'audio/webm';
+  const blob = new Blob(trozos, { type: tipo });
+  if (blob.size < 2000) { mostrarRespuesta('El audio quedó vacío. Probá de nuevo.', true); ponerEtiqueta('Tocá para grabar'); return; }
+  await encolarAudio(blob, tipo);
+}
+
+async function encolarAudio(blob, tipo) {
+  let mime = (tipo || 'audio/webm').split(';')[0].toLowerCase();
+  if (mime === 'audio/x-m4a' || mime === 'audio/m4a') mime = 'audio/mp4';
+  let b64 = await blobABase64(blob);
+  let wav = false;
+  if (store.get('forzarWav', '0') === '1' || FORMATOS_OK.indexOf(mime) < 0) {
+    try { b64 = await base64AWav(b64); mime = 'audio/wav'; wav = true; } catch (e) { /* se manda como está */ }
+  }
+  await colaPoner({ id: nuevoId(), ts: Date.now(), b64, mime, wav, intentos: 0 });
+  actualizarChip();
+  procesarCola();
+}
+
+/* ---------------- Conversión de audio ---------------- */
+
+function blobABase64(blob) {
+  return new Promise((ok, mal) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(',')[1]);
+    r.onerror = () => mal(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+function base64ABuffer(b64) {
+  const bin = atob(b64); const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8.buffer;
+}
+
+/** Convierte cualquier audio que el navegador sepa leer a WAV mono 16 kHz. */
+async function base64AWav(b64) {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  const audio = await new Promise((ok, mal) => ctx.decodeAudioData(base64ABuffer(b64), ok, mal));
+  ctx.close && ctx.close();
+  const sr = 16000;
+  const off = new OfflineAudioContext(1, Math.ceil(audio.duration * sr), sr);
+  const src = off.createBufferSource(); src.buffer = audio; src.connect(off.destination); src.start();
+  const out = await off.startRendering();
+  const pcm = out.getChannelData(0);
+  const buf = new ArrayBuffer(44 + pcm.length * 2); const v = new DataView(buf);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + pcm.length * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  w(36, 'data'); v.setUint32(40, pcm.length * 2, true);
+  for (let i = 0; i < pcm.length; i++) { const s = Math.max(-1, Math.min(1, pcm[i])); v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true); }
+  return blobABase64(new Blob([buf], { type: 'audio/wav' }));
+}
+
+/* ---------------- Respuestas y voz ---------------- */
+
+function ponerEtiqueta(t) { $('etiqueta').textContent = t; }
+
+function mostrarRespuesta(texto, esError, sinVoz, transcripcion, detalle) {
+  ultimoMensaje = texto;
+  $('cardRespuesta').style.display = 'block';
+  const hayDetalle = Array.isArray(detalle) && detalle.length > 0;
+  $('respuesta').textContent = hayDetalle ? '' : texto;
+  $('respuesta').style.display = hayDetalle ? 'none' : 'block';
+  $('respuesta').classList.toggle('error', !!esError);
+  pintarDetalle(hayDetalle ? detalle : []);
+  $('transcripcion').style.display = 'none';
+  $('transcripcion').textContent = transcripcion ? '«' + transcripcion + '»' : '';
+  $('verTexto').style.display = transcripcion ? '' : 'none';
+  if (!sinVoz) hablar(texto);
+}
+
+/** Una tarjeta por caballo con TODAS las columnas; las que faltan, resaltadas. */
+function pintarDetalle(detalle) {
+  const cont = $('detalle');
+  cont.innerHTML = '';
+  detalle.forEach((d) => {
+    const div = document.createElement('div');
+    div.className = 'caballo';
+    const h = document.createElement('h3');
+    h.textContent = '🐴 ' + (d.equino || 'Sin nombre');
+    const e1 = document.createElement('span');
+    e1.className = 'etiq';
+    e1.textContent = d.accion === 'nuevo' ? 'nuevo' : 'actualizado';
+    const e2 = document.createElement('span');
+    e2.className = 'etiq ' + (d.faltan.length ? 'pend' : 'ok');
+    e2.textContent = d.faltan.length ? 'faltan ' + d.faltan.length : 'completo';
+    const donde = document.createElement('small');
+    donde.textContent = 'pestaña ' + d.hoja + ' · fila ' + d.fila;
+    h.append(e1, e2, donde);
+    div.appendChild(h);
+    const dl = document.createElement('dl');
+    dl.className = 'campos';
+    d.campos.forEach((c) => {
+      const dt = document.createElement('dt');
+      dt.textContent = c.titulo;
+      const dd = document.createElement('dd');
+      if (c.falta) {
+        const s = document.createElement('span');
+        s.className = 'falta';
+        s.textContent = 'falta';
+        dd.appendChild(s);
+      } else {
+        dd.textContent = c.valor || '—';
+      }
+      dl.append(dt, dd);
+    });
+    div.appendChild(dl);
+    cont.appendChild(div);
+  });
+}
+
+function desbloquearVoz() {
+  // iOS solo deja hablar si antes hubo un toque: se "despierta" la voz con un texto vacío.
+  if (!window.speechSynthesis || desbloquearVoz.hecho) return;
+  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); desbloquearVoz.hecho = true; } catch (e) {}
+}
+
+function vozEspanol() {
+  const vs = (window.speechSynthesis && speechSynthesis.getVoices()) || [];
+  return vs.find((v) => /es[-_]AR/i.test(v.lang)) || vs.find((v) => /es[-_](419|US|MX|UY|CL)/i.test(v.lang)) || vs.find((v) => /^es/i.test(v.lang)) || null;
+}
+
+function hablar(texto) {
+  if (!vozActiva || !window.speechSynthesis || !texto) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(texto.replace(/\$/g, '').replace(/USD/g, 'dólares'));
+    u.lang = 'es-AR';
+    const v = vozEspanol(); if (v) u.voice = v;
+    u.rate = 1.05;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+/* ---------------- Estado del servidor (pendientes y avisos) ---------------- */
+
+async function refrescarEstado() {
+  if (!clave || !navigator.onLine) return;
+  let r;
+  try { r = await llamar('estado', { clave }); } catch (e) { return; }
+  if (!r || !r.ok) return;
+  const ul = $('listaPend'); ul.innerHTML = '';
+  (r.pendientes || []).forEach((p) => {
+    const li = document.createElement('li');
+    li.textContent = p.equino + ': falta ' + p.faltan.join(', ');
+    ul.appendChild(li);
+  });
+  $('pendientes').style.display = (r.pendientes && r.pendientes.length) ? 'block' : 'none';
+  if (r.avisos && r.avisos.length) mostrarRespuesta(r.avisos.join(' '), false, false);
+}
+
+/* ---------------- Clave ---------------- */
+
+function pedirClave(msg) {
+  $('pantallaClave').style.display = 'flex';
+  $('errClave').textContent = msg || '';
+  setTimeout(() => $('inClave').focus(), 50);
+}
+
+async function guardarClave() {
+  const k = $('inClave').value.trim();
+  if (!k) return;
+  $('errClave').textContent = 'Verificando…';
+  let r;
+  try { r = await llamar('verificar', { clave: k }); }
+  catch (e) { $('errClave').textContent = 'Sin conexión. Probá de nuevo con señal.'; return; }
+  if (r && r.ok) {
+    clave = k; store.set('clave', k);
+    $('pantallaClave').style.display = 'none';
+    procesarCola(); refrescarEstado();
+  } else {
+    $('errClave').textContent = (r && r.mensaje) || 'Clave incorrecta.';
+  }
+}
+
+/* ---------------- Eventos ---------------- */
+
+$('btn').addEventListener('click', () => {
+  if (!clave) { pedirClave(); return; }
+  if (grabando) detenerGrabacion(false);
+  else iniciarGrabacion();
+});
+$('cancelar').addEventListener('click', () => detenerGrabacion(true));
+$('repetir').addEventListener('click', () => { desbloquearVoz(); hablar(ultimoMensaje); });
+$('verTexto').addEventListener('click', () => {
+  const t = $('transcripcion'); t.style.display = t.style.display === 'none' ? 'block' : 'none';
+});
+$('enviarTexto').addEventListener('click', async () => {
+  const t = $('texto').value.trim();
+  if (!t) return;
+  if (!clave) { pedirClave(); return; }
+  desbloquearVoz();
+  $('texto').value = '';
+  await colaPoner({ id: nuevoId(), ts: Date.now(), texto: t, intentos: 0 });
+  actualizarChip(); procesarCola();
+});
+$('archivo').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  if (!clave) { pedirClave(); return; }
+  desbloquearVoz();
+  ponerEtiqueta('Enviando…');
+  await encolarAudio(f, f.type || 'audio/mp4');
+  e.target.value = '';
+});
+$('guardarClave').addEventListener('click', guardarClave);
+$('inClave').addEventListener('keydown', (e) => { if (e.key === 'Enter') guardarClave(); });
+$('cambiarClave').addEventListener('click', () => { $('inClave').value = ''; pedirClave(); });
+$('toggleVoz').addEventListener('click', () => {
+  vozActiva = !vozActiva; store.set('voz', vozActiva ? '1' : '0');
+  $('toggleVoz').textContent = '🔊 Voz: ' + (vozActiva ? 'sí' : 'no');
+  if (!vozActiva && window.speechSynthesis) speechSynthesis.cancel();
+});
+
+window.addEventListener('online', () => { actualizarChip(); procesarCola(); });
+window.addEventListener('offline', actualizarChip);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { procesarCola(); refrescarEstado(); } });
+if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => {};
+
+/* ---------------- Inicio ---------------- */
+
+(function inicio() {
+  $('toggleVoz').textContent = '🔊 Voz: ' + (vozActiva ? 'sí' : 'no');
+  const hayMic = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  if (!hayMic) $('respaldo').style.display = 'block';
+  if (!clave) pedirClave();
+  actualizarChip();
+  procesarCola();
+  refrescarEstado();
+  setInterval(() => { procesarCola(); }, 30000);
+  setInterval(refrescarEstado, 120000);
+})();
+</script>
+</body>
+</html>
